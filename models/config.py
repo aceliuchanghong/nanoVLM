@@ -1,77 +1,46 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
 class VLMConfig:
-    vit_hidden_dim: int = 768
-    vit_inter_dim: int = 4 * vit_hidden_dim
-    vit_patch_size: int = 16
-    vit_img_size: int = 512
-    vit_n_heads: int = 12
-    vit_dropout: float = 0.0
-    vit_n_blocks: int = 12
-    vit_ln_eps: float = 1e-6
-    vit_cls_flag: bool = False
-    vit_model_type: str = 'google/siglip2-base-patch16-512'
+    # 定义我们选择的模型ID
+    vision_model_id: str = "/mnt/data/llch/Models/Qwen2.5-VL-3B-Instruct"
+    lang_model_id: str = "/mnt/data/llch/Models/Qwen3-4B-Instruct-2507"
 
-    lm_hidden_dim: int = 960
-    lm_inter_dim: int = 2560
-    lm_rms_eps: float = 1e-5
-    lm_re_base: int = 100000
-    lm_max_position_embeddings: int = 8192
-    lm_base_vocab_size: int = 49152
-    extra_token_amount: int = 17  # Number of extra tokens for the VLM (image start, image end, image token)
-    lm_vocab_size: int = lm_base_vocab_size + extra_token_amount # Not a great way to do this, but it works for now (vlm_extra_tokens cannot be a dict, since this is mutable, and a Field has no len() function)
-    lm_n_heads: int = 15
-    lm_n_kv_heads: int = 5
-    lm_dropout: float = 0.0
-    lm_n_blocks: int = 32
-    lm_attn_scaling: float = 1.0
-    lm_max_length: int = 1024
-    lm_use_tokens: bool = False # Decide if the LM expects tokens or embeddings as input (if using as a backbone for the VLM, set to False)
-    lm_tie_weights: bool = True # Decide if you want to tie the LM Head weight to the token embedding weights
-    lm_model_type: str = 'HuggingFaceTB/SmolLM2-360M-Instruct'
-    lm_tokenizer: str = 'HuggingFaceTB/SmolLM2-360M-Instruct'
-    lm_chat_template: str = "{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
+    # 视觉编码器的输出维度
+    vision_hidden_size: int = 1280
+    # 语言模型的输入维度
+    lang_hidden_size: int = 2560
 
-    mp_pixel_shuffle_factor: int = 4
-    mp_image_token_length: int = 64
+    # 语言模型的词汇表大小，可以从tokenizer动态获取
+    vocab_size: int = 152064  # Qwen3-4B-Instruct-2507 的 vocab_size
 
-    max_img_size: int = 1024
+    # 图像块相关配置 (可以保持nanoVLM默认或根据Qwen-VL调整)
+    patch_size: int = 14  # Qwen2.5-VL-3B uses patch_size 14
+    image_size: int = (
+        448  # Qwen2.5-VL-3B supports dynamic resolution, 448 is a good default
+    )
 
-    vlm_extra_tokens: dict[str, str] = field(default_factory=lambda: {"image_token": "<|image|>",
-      "r1c1": "<row_1_col_1>", "r1c2": "<row_1_col_2>", "r1c3": "<row_1_col_3>", "r1c4": "<row_1_col_4>",
-      "r2c1": "<row_2_col_1>", "r2c2": "<row_2_col_2>", "r2c3": "<row_2_col_3>", "r2c4": "<row_2_col_4>",
-      "r3c1": "<row_3_col_1>", "r3c2": "<row_3_col_2>", "r3c3": "<row_3_col_3>", "r3c4": "<row_3_col_4>",
-      "r4c1": "<row_4_col_1>", "r4c2": "<row_4_col_2>", "r4c3": "<row_4_col_3>", "r4c4": "<row_4_col_4>"})
-    vlm_load_backbone_weights: bool = True
-    vlm_checkpoint_path: str = 'checkpoints'
-    hf_repo_name: str = 'nanoVLM'
+    # 模态投影层配置
+    use_pixel_shuffle: bool = True
+    pixel_shuffle_factor: int = 2  # 保持默认，将视觉token数量减少4倍
 
 
 @dataclass
 class TrainConfig:
-    lr_mp: float = 0.00512
-    lr_backbones: float = 5e-5
-    data_cutoff_idx: int = None
-    val_ratio: float = 0.025
+    # 训练超参数
     batch_size: int = 8
-    gradient_accumulation_steps: int = 8
-    max_grad_norm: float = 1.0
-    eval_in_epochs: bool = True
-    eval_interval: int = gradient_accumulation_steps * 100
-    stats_log_interval: int = gradient_accumulation_steps * 25
-    max_training_steps: int = 5000
-    max_images_per_example: int = 4
-    max_images_per_knapsack: int = 18
-    max_sample_length: int = 1024
-    compile: bool = False
-    resume_from_vlm_checkpoint: bool = False # Indicate if the training should be resumed from a checkpoint of the whole VLM or you want to start from scratch
-    train_dataset_path: str = 'HuggingFaceM4/the_cauldron'
-    train_dataset_name: tuple[str, ...] = ("all", )
-    wandb_entity: str = "HuggingFace" # Indicate the entity to log to in wandb
+    epochs: int = 5
+
+    # 学习率设置 (采用差分学习率)
+    projector_lr: float = 1e-3
+    finetune_lr: float = 1e-5
+
+    # 训练控制
+    num_workers: int = 4
+    device: str = "cuda"
+
+    # 日志和保存
     log_wandb: bool = True
-    use_lmms_eval: bool = True # Use lmms-eval for evaluation
-    lmms_eval_tasks: str = 'mmstar,mmmu,ocrbench,textvqa' # Pass additional task as one string, seperated by commas without spaces (e.g. 'mmstar,mmmu,ocrbench')
-    lmms_eval_limit: int = 2000
-    lmms_eval_batch_size: int = 128
+    checkpoint_path: str = "./checkpoints/"
+    run_name: str = "docuvlm-qwen-run"

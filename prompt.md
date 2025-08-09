@@ -2,12 +2,20 @@
 
 ---
 
-我想做...
-
+我想做nanovlm的学习:`https://github.com/huggingface/nanoVLM`
+但是我想切换 Language / Vision backbone为:
+```
+# 模型已下载好了
+llm: Qwen3-4B-Instruct-2507
+vlm: Qwen2.5-VL-3B-Instruct
+```
+1. 我想做的效果是还原中文文档图片为markdown,我应该找哪些数据呢?给出hf上面的库名
+2. 我需要一步步教学,但是核心应该是数据处理之后的传给模型应该是怎么样子的json
+3. llm,vlm模型架构需要修改吗?
+4. 给出教学 逐步引导，用通俗语言解释清楚 深入讲解关键细节或进阶内容，保持清晰 确保每步逻辑连贯，语言亲切，像老师一样耐心引导
 
 
 ---
-
 
 
 
